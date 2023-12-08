@@ -41,9 +41,15 @@ def parse_config():
 
     parser.add_argument('--max_waiting_mins', type=int, default=0, help='max waiting minutes')
     parser.add_argument('--start_epoch', type=int, default=0, help='')
-    parser.add_argument('--num_epochs_to_eval', type=int, default=20, help='number of checkpoints to be evaluated')    # 30  80
+    parser.add_argument('--num_epochs_to_eval', type=int, default=10, help='number of checkpoints to be evaluated')    # 30  80
     parser.add_argument('--save_to_file', action='store_true', default=False, help='')
 
+    parser.add_argument('--use_tqdm_to_record', action='store_true', default=False, help='if True, the intermediate losses will not be logged to file, only tqdm will be used')
+    parser.add_argument('--logger_iter_interval', type=int, default=50, help='')
+    parser.add_argument('--ckpt_save_time_interval', type=int, default=300, help='in terms of seconds')
+    parser.add_argument('--wo_gpu_stat', action='store_true', help='')
+    parser.add_argument('--use_amp', action='store_true', help='use mix precision training')
+    
     args = parser.parse_args()
 
     cfg_from_yaml_file(args.cfg_file, cfg) #此函数是将输入的args.cfg参数赋值给cfg
@@ -180,6 +186,7 @@ def main():
     if dist_train:
         model = nn.parallel.DistributedDataParallel(model, device_ids=[cfg.LOCAL_RANK % torch.cuda.device_count()])#find_unused_parameters=True
     logger.info(model)   #模型输出
+    
     # lr_scheduler  学习率   lr_warmup_scheduler关于warmup学习率
     lr_scheduler, lr_warmup_scheduler = build_scheduler(
         optimizer, total_iters_each_epoch=len(train_loader), total_epochs=args.epochs,
@@ -206,7 +213,14 @@ def main():
         lr_warmup_scheduler=lr_warmup_scheduler,
         ckpt_save_interval=args.ckpt_save_interval,
         max_ckpt_save_num=args.max_ckpt_save_num,
-        merge_all_iters_to_one_epoch=args.merge_all_iters_to_one_epoch
+        merge_all_iters_to_one_epoch=args.merge_all_iters_to_one_epoch,
+        logger=logger, 
+        logger_iter_interval=args.logger_iter_interval,
+        ckpt_save_time_interval=args.ckpt_save_time_interval,
+        use_logger_to_record=not args.use_tqdm_to_record, 
+        show_gpu_stat=not args.wo_gpu_stat,
+        use_amp=args.use_amp,
+        cfg=cfg
     )
 
     if hasattr(train_set, 'use_shared_memory') and train_set.use_shared_memory:

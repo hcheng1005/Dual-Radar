@@ -241,6 +241,31 @@ class VoxelResBackBone8x(nn.Module):
             SparseBasicBlock(128, 128, norm_fn=norm_fn, indice_key='res4'),
             SparseBasicBlock(128, 128, norm_fn=norm_fn, indice_key='res4'),
         )
+        
+        # # 以下调整是适配arbe数据
+        # #---------------------------------------------------------#
+        # self.conv2 = spconv.SparseSequential(
+        #     # [1600, 1408, 41] <- [800, 704, 21]
+        #     block(16, 32, 3, norm_fn=norm_fn, stride=(1,2,2), padding=1, indice_key='spconv2', conv_type='spconv'),
+        #     SparseBasicBlock(32, 32, norm_fn=norm_fn, indice_key='res2'),
+        #     SparseBasicBlock(32, 32, norm_fn=norm_fn, indice_key='res2'),
+        # )
+
+        # self.conv3 = spconv.SparseSequential(
+        #     # [800, 704, 21] <- [400, 352, 11]
+        #     block(32, 64, 3, norm_fn=norm_fn, stride=((1,2,2)), padding=1, indice_key='spconv3', conv_type='spconv'),
+        #     SparseBasicBlock(64, 64, norm_fn=norm_fn, indice_key='res3'),
+        #     SparseBasicBlock(64, 64, norm_fn=norm_fn, indice_key='res3'),
+        # )
+
+
+        # self.conv4 = spconv.SparseSequential(
+        #     # [400, 352, 11] <- [200, 176, 5]
+        #     block(64, 128, 3, norm_fn=norm_fn, stride=2, padding=(1, 1, 1), indice_key='spconv4', conv_type='spconv'),
+        #     SparseBasicBlock(128, 128, norm_fn=norm_fn, indice_key='res4'),
+        #     SparseBasicBlock(128, 128, norm_fn=norm_fn, indice_key='res4'),
+        # )
+        # #---------------------------------------------------------#
 
         last_pad = 0
         last_pad = self.model_cfg.get('last_pad', last_pad)
@@ -271,6 +296,9 @@ class VoxelResBackBone8x(nn.Module):
                 encoded_spconv_tensor: sparse tensor
         """
         voxel_features, voxel_coords = batch_dict['voxel_features'], batch_dict['voxel_coords']
+        
+        # print(voxel_features.shape)
+        
         batch_size = batch_dict['batch_size']
         input_sp_tensor = spconv.SparseConvTensor(
             features=voxel_features,
@@ -278,16 +306,23 @@ class VoxelResBackBone8x(nn.Module):
             spatial_shape=self.sparse_shape,
             batch_size=batch_size
         )
+        
         x = self.conv_input(input_sp_tensor)
 
         x_conv1 = self.conv1(x)
         x_conv2 = self.conv2(x_conv1)
         x_conv3 = self.conv3(x_conv2)
         x_conv4 = self.conv4(x_conv3)
-
+        
         # for detection head
         # [200, 176, 5] -> [200, 176, 2]
         out = self.conv_out(x_conv4)
+        
+        # print(f'x_conv1 shape: {x_conv1.dense().shape}')
+        # print(f'x_conv1 shape: {x_conv2.dense().shape}')
+        # print(f'x_conv1 shape: {x_conv3.dense().shape}')
+        # print(f'x_conv1 shape: {x_conv4.dense().shape}')
+        # print(f'out shape: {out.dense().shape}')
 
         batch_dict.update({
             'encoded_spconv_tensor': out,

@@ -19,9 +19,11 @@ from pcdet.datasets import DatasetTemplate
 from pcdet.models import build_network, load_data_to_gpu
 from pcdet.utils import common_utils
 
+from skimage import io
+from matplotlib import pyplot as plt
 
 class DemoDataset(DatasetTemplate):
-    def __init__(self, dataset_cfg, class_names, training=True, root_path=None, logger=None, ext='.bin'):
+    def __init__(self, dataset_cfg, class_names, training=True, root_path=None, img_path=None, logger=None, ext='.bin'):
         """
         Args:
             root_path:
@@ -38,9 +40,14 @@ class DemoDataset(DatasetTemplate):
         self.root_path = root_path
         self.ext = ext
         data_file_list = glob.glob(str(root_path / f'*{self.ext}')) if self.root_path.is_dir() else [self.root_path]
-
         data_file_list.sort()
+        
+        img_format = '.png'
+        img_file_list = glob.glob(str(img_path / f'*{img_format}')) if img_path.is_dir() else [img_path]
+        img_file_list.sort()
+        
         self.sample_file_list = data_file_list
+        self.img_file_list = img_file_list
 
     def __len__(self):
         return len(self.sample_file_list)
@@ -59,6 +66,9 @@ class DemoDataset(DatasetTemplate):
         else:
             raise NotImplementedError
 
+        # 获取img
+        # img = np.array(io.imread(self.img_file_list[index]), dtype=np.int32).transpose([2,1,0])
+
         input_dict = {
             'points': points,
             'frame_id': index,
@@ -69,12 +79,20 @@ class DemoDataset(DatasetTemplate):
 
 
 def parse_config():
+    
+    cfg_file = 'cfgs/dual_radar_models/pointpillar_arbe.yaml'
+    data_path = '/data/chenghao/mycode/private/Dual-Radar/data/dual_radar/radar_arbe/testing/arbe'
+    img_path = '/data/chenghao/mycode/private/Dual-Radar/data/dual_radar/radar_arbe/testing/image'
+    ckpt = 'ckpt/pointpillars_arbe_80.pth'
+    
     parser = argparse.ArgumentParser(description='arg parser')
-    parser.add_argument('--cfg_file', type=str, default='/ai/volume/Dual-Radar-master/tools/cfgs/dual_radar_models/pointpillar_lidar.yaml',
+    parser.add_argument('--cfg_file', type=str, default=cfg_file,
                         help='specify the config for demo')
-    parser.add_argument('--data_path', type=str, default='/ai/volume/Dual-Radar-master/data/dual_radar/lidar/training/velodyne/000000.bin',
+    parser.add_argument('--data_path', type=str, default=data_path,
                         help='specify the point cloud data file or directory')
-    parser.add_argument('--ckpt', type=str, default='/ai/volume/Dual-Radar-master/models/pointpillars_liadr_80.pth', help='specify the pretrained model')
+    parser.add_argument('--img_path', type=str, default=img_path,
+                        help='specify the image data directory')
+    parser.add_argument('--ckpt', type=str, default=ckpt, help='specify the pretrained model')
     parser.add_argument('--ext', type=str, default='.bin', help='specify the extension of your point cloud data file')
 
     args = parser.parse_args()
@@ -90,7 +108,7 @@ def main():
     logger.info('-----------------Quick Demo of OpenPCDet-------------------------')
     demo_dataset = DemoDataset(
         dataset_cfg=cfg.DATA_CONFIG, class_names=cfg.CLASS_NAMES, training=False,
-        root_path=Path(args.data_path), ext=args.ext, logger=logger
+        root_path=Path(args.data_path), img_path=Path(args.img_path), ext=args.ext, logger=logger
     )
     logger.info(f'Total number of samples: \t{len(demo_dataset)}')
 
@@ -105,11 +123,18 @@ def main():
             load_data_to_gpu(data_dict)
             pred_dicts, _ = model.forward(data_dict)
 
+            # # 获取图片信息
+            # img = np.array(io.imread(demo_dataset.img_file_list[data_dict['frame_id'][0]]), dtype=np.int32)
+            # plt.figure()
+            # plt.imshow(img)
+            # plt.axis('off')
+            # plt.show()
+            
             V.draw_scenes(
                 points=data_dict['points'][:, 1:], ref_boxes=pred_dicts[0]['pred_boxes'],
                 ref_scores=pred_dicts[0]['pred_scores'], ref_labels=pred_dicts[0]['pred_labels']
             )
-
+            
             if not OPEN3D_FLAG:
                 mlab.show(stop=True)
 

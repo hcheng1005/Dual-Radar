@@ -8,6 +8,9 @@ import torch
 import matplotlib
 import numpy as np
 
+import time
+
+
 box_colormap = [
     [1, 1, 1],
     [0, 1, 0],
@@ -42,7 +45,7 @@ def draw_scenes(points, gt_boxes=None, ref_boxes=None, ref_labels=None, ref_scor
         gt_boxes = gt_boxes.cpu().numpy()
     if isinstance(ref_boxes, torch.Tensor):
         ref_boxes = ref_boxes.cpu().numpy()
-
+        print(ref_boxes.shape)
     vis = open3d.visualization.Visualizer()
     vis.create_window()
 
@@ -67,10 +70,31 @@ def draw_scenes(points, gt_boxes=None, ref_boxes=None, ref_labels=None, ref_scor
         vis = draw_box(vis, gt_boxes, (0, 0, 1))
 
     if ref_boxes is not None:
-        vis = draw_box(vis, ref_boxes, (0, 1, 0), ref_labels, ref_scores)
-
-    vis.run()
-    vis.destroy_window()
+        vis = draw_box(vis, ref_boxes, (0, 1, 0), ref_labels, ref_scores)    
+    
+    # # 获取渲染的图像
+    # image = vis.capture_screen_float_buffer(True)
+    # image = np.asarray(image)
+    # # 将图像从CUDA设备内存复制到主机内存
+    # image = image.copy()
+    # image = (image * 255).astype(np.uint8)
+    # image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+    # font = cv2.FONT_HERSHEY_SIMPLEX
+    # font_scale = 1.0
+    # color = (0, 0, 255)  # 文本颜色 (B, G, R)
+    # thickness = 2  # 文本线条粗细
+    # # print(log_info)
+    # for idx in range(len(log_info)):
+    #     image = cv2.putText(image, log_info[idx], (0, 40*(1+idx)), font, font_scale, color, thickness)
+    # cv2.imwrite(fileName + ".png", image)
+    
+        
+    vis.poll_events()
+    vis.update_renderer()
+    time.sleep(1)
+    
+    # vis.run()
+    # vis.destroy_window()
 
 
 def translate_boxes_to_open3d_instance(gt_boxes):
